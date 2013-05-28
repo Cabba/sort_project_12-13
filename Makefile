@@ -2,8 +2,8 @@ OPTIONS = -Wall -lpthread
 
 all: executive
 
-executive: executive.c
+executive: executive.c executive.h
 	gcc executive.c $(OPTIONS) -o executive
 
 clean:
-	rm executive *.o
+	rm -f executive *.o *~
