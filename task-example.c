@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <limits.h>
+#include <stdio.h>
 
 /* Lunghezza dell'iperperiodo */
 #define H_PERIOD_ 20
@@ -52,7 +53,8 @@ void task_init()
 
   /* frame 0 */
   SCHEDULE[0] = (int *) malloc( sizeof( int ) * 1 );
-  SCHEDULE[0][0] = -1;
+  SCHEDULE[0][0] = 0;
+  SCHEDULE[0][1] = -1;
 
   SLACK[0] = 4; /* tutto il frame */
 
@@ -138,10 +140,9 @@ void busy_calib()
 
 /* Nota: nel codice dei task e' lecito chiamare sp_task_request() */
 
- void task0_code()
-   {
-   /* Custom Code */
-   }
+void task0_code(){
+	printf("Funzione 0\n");	
+}
 
   void task1_code()
    {

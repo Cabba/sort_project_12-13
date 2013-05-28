@@ -4,6 +4,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include "executive.h"
+#include "task-example.c"
 
 ////////
 /// Code
@@ -32,7 +33,6 @@ void sp_task_handler(...)
 void* executive(void* param){
 	printf("***************** \nThe executive is started!!\n***************** \n");
 	struct timespec time;
-	struct timeval zero;
 
 	int frame_counter = 0;
 
@@ -41,10 +41,9 @@ void* executive(void* param){
 	time.tv_sec = zero.tv_sec;
 	time.tv_nsec = zero.tv_usec * 1000; // Conversion between microsecond and nanosecond
 	
-
 	while( frame_counter < NUM_FRAMES ){
 		// Print info
-		print_current_time(zero);
+		print_current_time("FRAME_EXPIRED", zero);
 	
 		pthread_cond_signal( &threads_cond[frame_counter] );
 	
@@ -56,13 +55,6 @@ void* executive(void* param){
 		++frame_counter;
 		pthread_mutex_unlock( &mutex );
 	}
-	/*
-	int i;	
-	for(i = 0; i < NUM_FRAMES; ++i ){
-		pthread_join( threads[i], NULL);
-	}
-	printf("* All the threads are join.\n");
-	*/
 
 	return NULL;
 }
@@ -72,6 +64,8 @@ void* executive(void* param){
  */
 void start(){
 	pthread_mutex_init( &mutex, NULL );
+	
+	task_init();	
 
 	threads_init();
 	executive_init();
@@ -88,6 +82,8 @@ void stop(){
 	for( i = 0; i < NUM_FRAMES; ++i )
 		pthread_cond_destroy( &threads_cond[i] );
 	free( threads_cond );	
+
+	task_destroy();
 
 	pthread_cond_destroy( &exec_wait_queue );
 	pthread_mutex_destroy( &mutex );
@@ -107,20 +103,23 @@ int main(int argc, char** argv){
 /// Private functions
 /////////////////////
 
-void print_current_time(struct timeval origin){
+void print_current_time(char* string, struct timeval origin){
 	struct timeval now;
 	gettimeofday(&now, NULL);
-	printf("*TIMING second: %lu, milliseconds: %lu\n", now.tv_sec - origin.tv_sec, (now.tv_usec - origin.tv_usec)/1000);
+	printf("** %s - TIMING second: %lu, milliseconds: %lu\n",string, now.tv_sec - origin.tv_sec, (now.tv_usec - origin.tv_usec)/1000);
 }
 
 /**
  * Initialize all the threads as real-time threads.
  */
 void threads_init(){
+	// Memory allocation for threads
 	threads_cond = (pthread_cond_t*) malloc( sizeof(pthread_cond_t) * NUM_FRAMES );
 	threads = (pthread_t*) malloc( sizeof(pthread_t) * NUM_FRAMES );
 	threads_index = (int*) malloc( sizeof(int) * NUM_FRAMES );
-
+	threads_state = (frame_states_t*) malloc( sizeof(frame_states_t) * NUM_FRAMES );	
+	
+	// Threads settings
 	pthread_attr_t frame_attr;
 	struct sched_param frame_param;	
 	int i = 0;	
@@ -169,6 +168,36 @@ void* frame_handler(void *param){
 	pthread_mutex_lock( &mutex );
 	pthread_cond_wait( &threads_cond[*frame_pos], &mutex );
 	pthread_mutex_unlock( &mutex );
-	printf("Thread %d is awake.\n", *frame_pos);
-	return NULL;
+	// Thread started ...	
+	pthread_mutex_lock( &mutex );
+	threads_state[*frame_pos] = BUSY;
+	pthread_mutex_unlock( &mutex );
+
+	printf("* Thread %d is starting.\n", *frame_pos);	
+	if( SCHEDULE[*frame_pos][0] < 0 )
+		printf("Warning: the frame %d is empty!!\n", *frame_pos);	
+
+	int i = 0;
+	while( SCHEDULE[*frame_pos][i] >= 0 ){
+		printf("<thread %d> iteration number %d, executing task %d\n", *frame_pos, i, SCHEDULE[*frame_pos][i]);
+		P_TASKS[ SCHEDULE[*frame_pos][i] ]();
+		++i;
+	}
+
+	pthread_mutex_lock( &mutex );
+	threads_state[*frame_pos] = IDLE;
+	print_current_time("THREAD SETTED IDLE", zero );
+	pthread_mutex_unlock( &mutex );
+	
+	return NULL; 
 }
+
+
+
+
+
+
+
+
+
+

@@ -3,8 +3,8 @@
 ////////////////////
 /// Global variables
 ////////////////////
-// Da rimuovere
-const unsigned int NUM_FRAMES = 5;
+// Time origin
+struct timeval zero;
 
 // Time declaration
 int nanosec = 10E8;
@@ -25,6 +25,12 @@ pthread_cond_t *threads_cond;
 pthread_t *threads;
 int *threads_index;
 
+// Frame states
+typedef enum{ BUSY, IDLE, PENDING } frame_states_t;
+
+// Thread state array
+frame_states_t *threads_state;
+
 ////////////////////////
 /// Functions prototypes
 ////////////////////////
@@ -36,4 +42,4 @@ void* frame_handler( void* param );
 
 void executive_init();
 void threads_init();
-void print_current_time( struct timeval origin );
+void print_current_time( char* string, struct timeval origin );
