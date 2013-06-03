@@ -15,6 +15,7 @@ pthread_mutex_t mutex;
 // Frame states
 typedef enum{ BUSY, IDLE, PENDING } frame_states_t;
 
+// Executive data
 typedef struct executive_data_t_{
 	pthread_t thread;
 	pthread_cond_t queue;
@@ -22,6 +23,7 @@ typedef struct executive_data_t_{
 	struct sched_param thread_param; 
 } executive_data_t; 	
 
+// Frame data
 typedef struct frame_data_t_ {
 	frame_states_t state;
 	int iteration;
@@ -35,6 +37,7 @@ typedef struct frame_data_t_ {
 
 frame_data_t *frames;
 executive_data_t executive_data;
+
 ////////////////////////
 /// Functions prototypes
 ////////////////////////
@@ -48,3 +51,4 @@ void executive_init();
 void threads_init();
 void print_current_time( char* string, struct timeval origin );
 void print_thread_state(int thread_number);
+void deadlinemiss_handler(int frame_id );

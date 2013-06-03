@@ -56,7 +56,9 @@ void* executive(void* param){
 		time.tv_sec += ( time.tv_nsec + nanosec ) / 1000000000;
 		time.tv_nsec = ( time.tv_nsec + nanosec ) % 1000000000;
 		pthread_cond_timedwait( &executive_data.queue, &mutex, &time );
-		print_thread_state(frame_counter);
+		
+		deadlinemiss_handler(frame_counter);
+
 		++frame_counter;
 		pthread_mutex_unlock( &mutex );
                 
@@ -116,16 +118,29 @@ int main(int argc, char** argv){
 
 /////////////////////
 /// Private functions
-/////////////////////
-
-
+////////////////////
+void deadlinemiss_handler(int frame_id){
+	frame_states_t state = frames[frame_id].state;
+	if( state == BUSY ){
+		printf("**!!** DEADLINE MISS **!!**\n");
+		int it = frames[frame_id].iteration;
+		printf("Uncompleted functions are: \n");
+		while( SCHEDULE[frame_id][it] >= 0 ){
+			printf("\t %d \n",SCHEDULE[frame_id][it] );
+			++it;
+		}
+		printf("The program will terminate .. now!\n");	
+		pthread_exit(NULL);
+		//exit(1);
+	} 	
+}
 
 void print_thread_state(int thread_number){
 	frame_states_t state = frames[thread_number].state;
 	int function = SCHEDULE[thread_number][ frames[thread_number].iteration ];
 
 	if( state == BUSY )
-		printf("Thread %d state: BUSY with function %d\n -- DEADLINE MISS", thread_number, function);
+		printf("Thread %d state: BUSY with function %d -- DEADLINE MISS\n", thread_number, function);
 	else if( state == IDLE )
 		printf("Thread %d state: IDLE then function %d\n", thread_number, function);
         else
