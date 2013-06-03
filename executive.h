@@ -28,8 +28,13 @@ int *threads_index;
 // Frame states
 typedef enum{ BUSY, IDLE, PENDING } frame_states_t;
 
-// Thread state array
-frame_states_t *threads_state;
+typedef struct {
+	frame_states_t *threads_state;
+        int counter_function;
+}frame_values;
+
+// Frame states array
+frame_values *threads_value;
 
 ////////////////////////
 /// Functions prototypes
@@ -43,3 +48,4 @@ void* frame_handler( void* param );
 void executive_init();
 void threads_init();
 void print_current_time( char* string, struct timeval origin );
+void print_thread_state(int thread_number);

@@ -53,15 +53,17 @@ void task_init()
 
   /* frame 0 */
   SCHEDULE[0] = (int *) malloc( sizeof( int ) * 1 );
-  SCHEDULE[0][0] = 0;
-  SCHEDULE[0][1] = -1;
+  SCHEDULE[0][0] = 1;
+  SCHEDULE[0][1] = 0;
+  SCHEDULE[0][2] = -1;
 
   SLACK[0] = 4; /* tutto il frame */
 
 
   /* frame 1 */
   SCHEDULE[1] = (int *) malloc( sizeof( int ) * 1 );
-  SCHEDULE[1][0] = -1;
+  SCHEDULE[1][0] = 0;
+  SCHEDULE[1][1] = -1;
 
   SLACK[1] = 4; /* tutto il frame */
 
@@ -144,10 +146,10 @@ void task0_code(){
 	printf("Funzione 0\n");	
 }
 
-  void task1_code()
-   {
-   /* Custom Code */
-   }
+void task1_code(){
+	printf("Funzione 1\n");
+	busy_wait(1500);   
+}
 
 
   void sp_task_code()
