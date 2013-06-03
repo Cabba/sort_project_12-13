@@ -9,33 +9,32 @@ struct timeval zero;
 // Time declaration
 int nanosec = 10E8;
 
-// Threads
-pthread_t exec_thread;
-
 // Global mutex
 pthread_mutex_t mutex;
-
-// Executive waiting queue
-pthread_cond_t exec_wait_queue;
-
-// Threads condition variables
-pthread_cond_t *threads_cond;
-
-// Threads 
-pthread_t *threads;
-int *threads_index;
 
 // Frame states
 typedef enum{ BUSY, IDLE, PENDING } frame_states_t;
 
-typedef struct {
-	frame_states_t *threads_state;
-        int counter_function;
-}frame_values;
+typedef struct executive_data_t_{
+	pthread_t thread;
+	pthread_cond_t queue;
+	pthread_attr_t thread_attr;
+	struct sched_param thread_param; 
+} executive_data_t; 	
 
-// Frame states array
-frame_values *threads_value;
+typedef struct frame_data_t_ {
+	frame_states_t state;
+	int iteration;
+	int id;
+	pthread_cond_t queue; 
+	// Threads variable
+	pthread_t thread;
+	pthread_attr_t thread_attr;
+	struct sched_param thread_param;
+} frame_data_t;
 
+frame_data_t *frames;
+executive_data_t executive_data;
 ////////////////////////
 /// Functions prototypes
 ////////////////////////
