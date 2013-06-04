@@ -9,7 +9,7 @@
 #define H_PERIOD_ 20
 
 /* Numero di frame */
-#define NUM_FRAMES_ 5
+#define NUM_FRAMES_ 2
 
 /* Numero di task */
 #define NUM_P_TASKS_ 3
@@ -52,25 +52,26 @@ void task_init(){
 	/* Inizializzazione di SCHEDULE e SLACK (se necessario) */
 
 	/* frame 0 */
-	SCHEDULE[0] = (int *) malloc( sizeof( int ) * 4 );
+	SCHEDULE[0] = (int *) malloc( sizeof( int ) * 2 );
 	SCHEDULE[0][0] = 0;
-	SCHEDULE[0][1] = 1;
-	SCHEDULE[0][2] = 2;
-  	SCHEDULE[0][3] = -1;
+	SCHEDULE[0][1] = -1;
+	//SCHEDULE[0][2] = 2;
+  	//SCHEDULE[0][3] = -1;
 	// Totale = 10 + 20 + 50 = 80ms -> slack = 20ms 
 
-	SLACK[0] = 2; /* tutto il frame */
+	SLACK[0] = 5; /* tutto il frame */
 
 
 	// frame 1  
-	SCHEDULE[1] = (int *) malloc( sizeof( int ) * 4 );
-	SCHEDULE[1][0] = 0;
-	SCHEDULE[1][1] = 1;
-	SCHEDULE[1][2] = 2;
-  	SCHEDULE[1][3] = -1;
+	SCHEDULE[1] = (int *) malloc( sizeof( int ) * 2 );
+	SCHEDULE[1][0] = 1;
+	SCHEDULE[1][1] = -1;
+	//SCHEDULE[1][2] = 2;
+  	//SCHEDULE[1][3] = -1;
 
 	SLACK[1] = 2; /* tutto il frame */
 
+/*
 	// frame 2
 	SCHEDULE[2] = (int *) malloc( sizeof( int ) * 4 );
 	SCHEDULE[2][0] = 0;
@@ -97,10 +98,10 @@ void task_init(){
   	SCHEDULE[4][3] = -1;
 
 	SLACK[4] = 2;
-
-  /* inizializzazione dei dati relativi al task sporadico */
-  SP_WCET = 1;
-  SP_DLINE = 10;
+*/
+  // inizializzazione dei dati relativi al task sporadico 
+  SP_WCET = 10;
+  SP_DLINE = 40;
 
   /* Custom Code */
   busy_calib();
@@ -146,27 +147,29 @@ void busy_calib()
 
   calib /= duration;
   calib *= 1000;
-  }
+}
   
 /**********************************************************/
 
 /* Nota: nel codice dei task e' lecito chiamare sp_task_request() */
 // teniamo una varianza di 3ms
 void task0_code(){
-	printf("\tFunzione 0 - 10ms\n");	
-	busy_wait(4);
+	//printf("\tFunzione 0 - 10ms\n");	
+	busy_wait(30);
 }
 
 void task1_code(){
-	printf("\tFunzione 1 - 10ms\n");
-	busy_wait(4);   
+	//printf("\tFunzione 1 - 10ms\n");
+	busy_wait(50);   
 }
 
 void task2_code(){
-	printf("\tFunzione 2 - 10ms\n");
-	busy_wait(4);
+	//printf("\tFunzione 2 - 10ms\n");
+	busy_wait(0);
 }
 
 void sp_task_code(){
-	/* Custom Code */
+	//printf("****** Sporadic job execution started\n");
+	busy_wait(100);
+	//printf("****** Sporadic job end\n");
 }
