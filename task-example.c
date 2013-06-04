@@ -12,10 +12,11 @@
 #define NUM_FRAMES_ 5
 
 /* Numero di task */
-#define NUM_P_TASKS_ 2
+#define NUM_P_TASKS_ 3
 
 void task0_code();
 void task1_code();
+void task2_code();
 
 void sp_task_code();
 
@@ -38,56 +39,65 @@ int SLACK[NUM_FRAMES_];
 int SP_WCET;
 int SP_DLINE;
 
-void task_init()
-  {
-  /* Inizializzazione di P_TASKS[] */
-  P_TASKS[0] = task0_code;
-  P_TASKS[1] = task1_code;
-  /* ... */
-  
-  /* Inizializzazione di SP_TASK */
-  SP_TASK = sp_task_code;
+void task_init(){
+	/* Inizializzazione di P_TASKS[] */
+	P_TASKS[0] = task0_code;
+	P_TASKS[1] = task1_code;
+ 	P_TASKS[2] = task2_code;
+ 
+	/* Inizializzazione di SP_TASK */
+	SP_TASK = sp_task_code;
 
 
-  /* Inizializzazione di SCHEDULE e SLACK (se necessario) */
+	/* Inizializzazione di SCHEDULE e SLACK (se necessario) */
 
-  /* frame 0 */
-  SCHEDULE[0] = (int *) malloc( sizeof( int ) * 1 );
-  SCHEDULE[0][0] = 1;
-  SCHEDULE[0][1] = 0;
-  SCHEDULE[0][2] = -1;
+	/* frame 0 */
+	SCHEDULE[0] = (int *) malloc( sizeof( int ) * 4 );
+	SCHEDULE[0][0] = 0;
+	SCHEDULE[0][1] = 1;
+	SCHEDULE[0][2] = 2;
+  	SCHEDULE[0][3] = -1;
+	// Totale = 10 + 20 + 50 = 80ms -> slack = 20ms 
 
-  SLACK[0] = 4; /* tutto il frame */
-
-
-  /* frame 1 */
-  SCHEDULE[1] = (int *) malloc( sizeof( int ) * 1 );
-  SCHEDULE[1][0] = 0;
-  SCHEDULE[1][1] = -1;
-
-  SLACK[1] = 4; /* tutto il frame */
+	SLACK[0] = 2; /* tutto il frame */
 
 
-  /* frame 2 */
-  SCHEDULE[2] = (int *) malloc( sizeof( int ) * 1 );
-  SCHEDULE[2][0] = -1;
+	// frame 1  
+	SCHEDULE[1] = (int *) malloc( sizeof( int ) * 4 );
+	SCHEDULE[1][0] = 0;
+	SCHEDULE[1][1] = 1;
+	SCHEDULE[1][2] = 2;
+  	SCHEDULE[1][3] = -1;
 
-  SLACK[2] = 4; /* tutto il frame */
+	SLACK[1] = 2; /* tutto il frame */
 
+	// frame 2
+	SCHEDULE[2] = (int *) malloc( sizeof( int ) * 4 );
+	SCHEDULE[2][0] = 0;
+	SCHEDULE[2][1] = 1;
+	SCHEDULE[2][2] = 2;
+  	SCHEDULE[2][3] = -1;
 
-  /* frame 3 */
-  SCHEDULE[3] = (int *) malloc( sizeof( int ) * 1 );
-  SCHEDULE[3][0] = -1;
+	SLACK[2] = 2;
 
-  SLACK[3] = 4; /* tutto il frame */
+	// frame 3
+	SCHEDULE[3] = (int *) malloc( sizeof( int ) * 4 );
+	SCHEDULE[3][0] = 0;
+	SCHEDULE[3][1] = 1;
+	SCHEDULE[3][2] = 2;
+  	SCHEDULE[3][3] = -1;
 
+	SLACK[3] = 2;
 
-  /* frame 4 */
-  SCHEDULE[4] = (int *) malloc( sizeof( int ) * 1 );
-  SCHEDULE[4][0] = -1;
-  
-  SLACK[4] = 4; /* tutto il frame */
-  
+	// frame 4
+	SCHEDULE[4] = (int *) malloc( sizeof( int ) * 4 );
+	SCHEDULE[4][0] = 0;
+	SCHEDULE[4][1] = 1;
+	SCHEDULE[4][2] = 2;
+  	SCHEDULE[4][3] = -1;
+
+	SLACK[4] = 2;
+
   /* inizializzazione dei dati relativi al task sporadico */
   SP_WCET = 1;
   SP_DLINE = 10;
@@ -141,18 +151,22 @@ void busy_calib()
 /**********************************************************/
 
 /* Nota: nel codice dei task e' lecito chiamare sp_task_request() */
-
+// teniamo una varianza di 3ms
 void task0_code(){
-	printf("Funzione 0\n");	
+	printf("\tFunzione 0 - 10ms\n");	
+	busy_wait(4);
 }
 
 void task1_code(){
-	printf("Funzione 1\n");
-	busy_wait(1500);   
+	printf("\tFunzione 1 - 10ms\n");
+	busy_wait(4);   
 }
 
+void task2_code(){
+	printf("\tFunzione 2 - 10ms\n");
+	busy_wait(4);
+}
 
-  void sp_task_code()
-   {
-   /* Custom Code */
-   }
+void sp_task_code(){
+	/* Custom Code */
+}

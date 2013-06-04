@@ -6,25 +6,22 @@
 #include "executive.h"
 #include "task-example.c"
 
-
-
 ////////
 /// Code
 ////////
 /*
 bool sp_task_request()
   {
-  // acceptance test etc. 
-  }
-
-void frame_handler(...)
-  {
+  //controlla slack time disponibile fino al periodo precedente alla deadline
+  //schedulaione prima dei task periodici, lancio thread  
   }
 
 void sp_task_handler(...)
   {
   }
 */
+
+
 
 
 
@@ -36,6 +33,8 @@ void sp_task_handler(...)
  */
 void* executive(void* param){
 	printf("***************** \nThe executive is started!!\n***************** \n");
+	wakeup_time = TIME_UNIT_IN_MILLI * MILLI_TO_NANO * H_PERIOD / NUM_FRAMES;
+	printf("** FRAME LENGTH is: %d[ms]\n", (int)(wakeup_time/1E6));
 	struct timespec time;
 
 	int frame_counter = 0;
@@ -45,23 +44,28 @@ void* executive(void* param){
 	time.tv_sec = zero.tv_sec;
 	time.tv_nsec = zero.tv_usec * 1000; // Conversion between microsecond and nanosecond
 	
-	while( frame_counter < NUM_FRAMES ){
+	while( /*frame_counter < NUM_FRAMES*/ true ){
 		// Print info
 		print_current_time("FRAME_EXPIRED", zero);
+		
+		sp_task_request(frame_counter);
 	
 		pthread_cond_signal( &(frames[frame_counter].queue) );
 	
 		// Time managing
 		pthread_mutex_lock( &mutex );				
-		time.tv_sec += ( time.tv_nsec + nanosec ) / 1000000000;
-		time.tv_nsec = ( time.tv_nsec + nanosec ) % 1000000000;
+		time.tv_sec += ( time.tv_nsec + wakeup_time ) / 1000000000;
+		time.tv_nsec = ( time.tv_nsec + wakeup_time ) % 1000000000;
 		pthread_cond_timedwait( &executive_data.queue, &mutex, &time );
-		
-		deadlinemiss_handler(frame_counter);
-
-		++frame_counter;
 		pthread_mutex_unlock( &mutex );
-                
+		
+		// Check deadline		
+		deadlinemiss_handler(frame_counter);
+		
+		frames[frame_counter].state = PENDING;
+				
+		++frame_counter; 
+		frame_counter = frame_counter % NUM_FRAMES; 
 	}
 
 	return NULL;
@@ -75,6 +79,8 @@ void* executive(void* param){
 void start(){
 	pthread_mutex_init( &mutex, NULL );
 	
+	sp_request = NONE;
+
 	task_init();	
 
 	threads_init();
@@ -119,6 +125,26 @@ int main(int argc, char** argv){
 /////////////////////
 /// Private functions
 ////////////////////
+bool sp_task_request( int current_frame ){
+	srand(time(NULL));
+	if( rand() % 100 / 100 <= 0.6 && sp_request == NONE ){
+		sp_request = CREATE;
+		printf("**** SPORADIC REQUEST\n");		
+	}
+	int frame_number = SP_DLINE / (H_PERIOD / NUM_FRAMES);
+	int available_execution = 0;
+	int count = 0;
+	while( count < frame_number ){
+		available_execution += SLACK[current_frame + count];
+		count++;
+	}
+	if( available_execution >= SP_WCET ){
+		printf("** SPORADIC JOB ACCEPTED!!\n");
+		return true;
+	}
+	return false;
+}
+
 void deadlinemiss_handler(int frame_id){
 	frame_states_t state = frames[frame_id].state;
 	if( state == BUSY ){
@@ -129,10 +155,16 @@ void deadlinemiss_handler(int frame_id){
 			printf("\t %d \n",SCHEDULE[frame_id][it] );
 			++it;
 		}
+	} 
+	if( state == PENDING ){
+		printf("**!!** Thread isn't started **!!**\n");
+	}
+	if( state == PENDING || state == BUSY ){	
 		printf("The program will terminate .. now!\n");	
-		pthread_exit(NULL);
+		pthread_exit(NULL);	
+		// TODO: liberare la memoria prima di fare exit(1)
 		//exit(1);
-	} 	
+	}
 }
 
 void print_thread_state(int thread_number){
@@ -211,39 +243,36 @@ void* frame_handler(void *param){
 	frame_data_t *frame_data = (frame_data_t*)param;
 	printf( "Thread %d is sleeping.\n", frame_data->id );
 	
+	while( true ){
+		pthread_mutex_lock( &mutex );
+		pthread_cond_wait( &frame_data->queue, &mutex );
+		pthread_mutex_unlock( &mutex );
+
+		// Thread started ...	
+		pthread_mutex_lock( &mutex );
+		frame_data->state = BUSY;
+		frame_data->iteration = 0;
+		pthread_mutex_unlock( &mutex );
 
 
-	pthread_mutex_lock( &mutex );
-	pthread_cond_wait( &frame_data->queue, &mutex );
-	pthread_mutex_unlock( &mutex );
+		// TODO: Aggiungere l'esecuzione ciclica.
+		printf("* Thread %d is starting.\n", frame_data->id );	
+		if( SCHEDULE[frame_data->id][0] < 0 )
+			printf("Warning: the frame %d is empty!!\n", frame_data->id);	
 
+		int i = 0;
+		while( SCHEDULE[frame_data->id][i] >= 0 ){
+			printf("\t<thread %d> iteration number %d, executing task %d\n", frame_data->id, i, SCHEDULE[frame_data->id][i]);
+			frame_data->iteration = i;
+			P_TASKS[ SCHEDULE[frame_data->id][i] ]();
+			++i;
+		}
 
-	// Thread started ...	
-	pthread_mutex_lock( &mutex );
-	frame_data->state = BUSY;
-	frame_data->iteration = 0;
-	pthread_mutex_unlock( &mutex );
-
-
-	// TODO: Aggiungere l'esecuzione ciclica.
-	printf("* Thread %d is starting.\n", frame_data->id );	
-	if( SCHEDULE[frame_data->id][0] < 0 )
-		printf("Warning: the frame %d is empty!!\n", frame_data->id);	
-
-	int i = 0;
-	while( SCHEDULE[frame_data->id][i] >= 0 ){
-		printf("<thread %d> iteration number %d, executing task %d\n", frame_data->id, i, SCHEDULE[frame_data->id][i]);
-		frame_data->iteration = i;
-		P_TASKS[ SCHEDULE[frame_data->id][i] ]();
-                ++i;
-	}
-
-
-
-	pthread_mutex_lock( &mutex );
-	frame_data->state = IDLE;
-	print_current_time("THREAD SETTED IDLE", zero );
-	pthread_mutex_unlock( &mutex );
+		pthread_mutex_lock( &mutex );
+		frame_data->state = IDLE;
+		print_current_time("THREAD SETTED IDLE", zero );
+		pthread_mutex_unlock( &mutex );
+	}	
 	
 	return NULL; 
 }
