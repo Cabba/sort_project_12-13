@@ -9,7 +9,7 @@
 #define H_PERIOD_ 20
 
 /* Numero di frame */
-#define NUM_FRAMES_ 2
+#define NUM_FRAMES_ 5
 
 /* Numero di task */
 #define NUM_P_TASKS_ 3
@@ -44,67 +44,58 @@ void task_init(){
 	P_TASKS[0] = task0_code;
 	P_TASKS[1] = task1_code;
  	P_TASKS[2] = task2_code;
- 
+
 	/* Inizializzazione di SP_TASK */
 	SP_TASK = sp_task_code;
 
-
-	/* Inizializzazione di SCHEDULE e SLACK (se necessario) */
-
 	/* frame 0 */
-	SCHEDULE[0] = (int *) malloc( sizeof( int ) * 2 );
+	SCHEDULE[0] = (int *) malloc( sizeof( int ) * 4 );
 	SCHEDULE[0][0] = 0;
-	SCHEDULE[0][1] = -1;
-	//SCHEDULE[0][2] = 2;
-  	//SCHEDULE[0][3] = -1;
-	// Totale = 10 + 20 + 50 = 80ms -> slack = 20ms 
+	SCHEDULE[0][1] = 1;
+	SCHEDULE[0][2] = 2;
+	SCHEDULE[0][3] = -1;
 
-	SLACK[0] = 5; /* tutto il frame */
+	SLACK[0] = 0; /* tutto il frame */
 
 
 	// frame 1  
 	SCHEDULE[1] = (int *) malloc( sizeof( int ) * 2 );
-	SCHEDULE[1][0] = 1;
+	SCHEDULE[1][0] = 0;
 	SCHEDULE[1][1] = -1;
-	//SCHEDULE[1][2] = 2;
-  	//SCHEDULE[1][3] = -1;
 
-	SLACK[1] = 2; /* tutto il frame */
+	SLACK[1] = 3; /* tutto il frame */
 
-/*
+
 	// frame 2
-	SCHEDULE[2] = (int *) malloc( sizeof( int ) * 4 );
+	SCHEDULE[2] = (int *) malloc( sizeof( int ) * 3 );
 	SCHEDULE[2][0] = 0;
 	SCHEDULE[2][1] = 1;
-	SCHEDULE[2][2] = 2;
-  	SCHEDULE[2][3] = -1;
+	SCHEDULE[2][2] = -1;
 
-	SLACK[2] = 2;
+	SLACK[2] = 1;
 
 	// frame 3
-	SCHEDULE[3] = (int *) malloc( sizeof( int ) * 4 );
+	SCHEDULE[3] = (int *) malloc( sizeof( int ) * 3 );
 	SCHEDULE[3][0] = 0;
 	SCHEDULE[3][1] = 1;
-	SCHEDULE[3][2] = 2;
-  	SCHEDULE[3][3] = -1;
+  	SCHEDULE[3][2] = -1;
 
-	SLACK[3] = 2;
+	SLACK[3] = 1;
 
 	// frame 4
-	SCHEDULE[4] = (int *) malloc( sizeof( int ) * 4 );
+	SCHEDULE[4] = (int *) malloc( sizeof( int ) * 3 );
 	SCHEDULE[4][0] = 0;
 	SCHEDULE[4][1] = 1;
-	SCHEDULE[4][2] = 2;
-  	SCHEDULE[4][3] = -1;
+  	SCHEDULE[4][2] = -1;
 
-	SLACK[4] = 2;
-*/
-  // inizializzazione dei dati relativi al task sporadico 
-  SP_WCET = 100;
-  SP_DLINE = 400;
+	SLACK[4] = 1;
 
-  /* Custom Code */
-  busy_calib();
+  	// inizializzazione dei dati relativi al task sporadico 
+  	SP_WCET = 5;
+  	SP_DLINE = 15;
+
+  	/* Custom Code */
+  	busy_calib();
   }
 
 void task_destroy()
@@ -154,23 +145,17 @@ void busy_calib()
 /* Nota: nel codice dei task e' lecito chiamare sp_task_request() */
 // teniamo una varianza di 3ms
 void task0_code(){
-	//printf("\tFunzione 0 - 10ms\n");	
-	busy_wait(10);
-	sp_task_request();
+	busy_wait(5);
 }
 
 void task1_code(){
-	//printf("\tFunzione 1 - 10ms\n");
-	busy_wait(40);   
+	busy_wait(10);   
 }
 
 void task2_code(){
-	//printf("\tFunzione 2 - 10ms\n");
-	busy_wait(0);
+	busy_wait(5);
 }
 
 void sp_task_code(){
-	//printf("****** Sporadic job execution started\n");
-	busy_wait(1000);
-	//printf("****** Sporadic job end\n");
+	busy_wait(50);
 }

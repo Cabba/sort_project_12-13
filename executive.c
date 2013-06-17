@@ -6,8 +6,6 @@
 #include <stdbool.h>
 
 // Application specific library
-#include "executive.h"
-#include "task-example.c"
 #include "task.h"
 
 #ifndef TIME_UNIT_IN_MILLI
@@ -215,8 +213,8 @@ bool sp_task_request(){
 	if( sp_data.state == PENDING ){ 
 		int frame_number = SP_DLINE / (H_PERIOD / NUM_FRAMES);
 		int available_execution = 0;
-		int count = 0;
-		while( count < frame_number ){
+		int count = 1;
+		while( count <= frame_number ){
 			available_execution += SLACK[(frame_counter + count) % NUM_FRAMES];
 			count++;
 		}
