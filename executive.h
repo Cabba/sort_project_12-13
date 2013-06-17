@@ -60,6 +60,8 @@ thread_data_t executive_data;
 // Sporadic task data, devono accedervi EXECUTIVE, SPORADIC
 sp_data_t sp_data;
 
+// The current number of the frame
+int frame_counter;
 
 ////////////////////////
 /// Functions prototypes
@@ -120,7 +122,7 @@ void stop();
  * Check is the sporadic task can be accepted considering
  * his WCET and his DEADLINE
  */
-bool sp_task_request( );
+bool sp_task_request();
 
 /**
  * Immediate program termination

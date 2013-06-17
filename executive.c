@@ -3,8 +3,145 @@
 #include <pthread.h>
 #include <sys/time.h>
 #include <time.h>
+#include <stdbool.h>
+
+// Application specific library
 #include "executive.h"
 #include "task-example.c"
+#include "task.h"
+
+#ifndef TIME_UNIT_IN_MILLI
+	#define TIME_UNIT_IN_MILLI 10
+#endif // TIME_UNIT_IN_MILLI
+
+#ifndef MILLI_TO_NANO
+	#define MILLI_TO_NANO 1E6
+#endif // MILLI_TO_NANO
+
+#ifndef SP_REQUEST_PROBABILITY
+	#define SP_REQUEST_PROBABILITY 0.1
+#endif // SP_REQUEST_PROBABILITY
+
+///////////////////
+/// Data structures
+///////////////////
+// Frame states
+typedef enum{ BUSY, IDLE, PENDING } frame_states_t;
+
+// Generical thread data
+typedef struct thread_data_t_{
+	pthread_t 			thread;
+	pthread_cond_t 		queue;
+	pthread_attr_t 		attr;
+	struct sched_param 	param; 
+} thread_data_t; 	
+
+// Frame data
+typedef struct frame_data_t_ {
+	int 				id;
+	int 				iteration;
+	frame_states_t 		state; 
+	thread_data_t 		thread_data;
+} frame_data_t;
+
+// Sporadic task data
+typedef struct sp_data_t_{
+	thread_data_t 		thread_data;
+	frame_states_t 		state;
+	int 				deadline_counter;
+} sp_data_t;
+
+////////////////////
+/// Global variables
+////////////////////
+// Time origin
+struct timeval zero;
+
+// Global mutex
+pthread_mutex_t mutex;
+
+// Frames datai, ogni frame deve accedere al proprio e EXECUTIVE
+frame_data_t *frames;
+
+// Executive data, solo EXECUTIVE
+thread_data_t executive_data;
+
+// Sporadic task data, devono accedervi EXECUTIVE, SPORADIC
+sp_data_t sp_data;
+
+// The current number of the frame
+int frame_counter;
+
+////////////////////////
+/// Functions prototypes
+////////////////////////
+
+/// HANDLERS
+
+/**
+ * Function for the executive handling
+ */
+void* executive( void* param );
+
+/**
+ * Function for the frame handling
+ */
+void* frame_handler( void* param );
+
+/**
+ * Function for sporadic task handling
+ */
+void* sp_task_handler( void* param );
+
+/**
+ * The handler called if a perdiodic task deadlinemiss occour.
+ */
+ void deadlinemiss_handler(int frame_id );
+
+/// INITIALIZAZION FUNCTIONS
+
+/**
+ * Executive initialization
+ */
+void executive_init();
+
+/**
+ * Frames task initialization
+ */
+void frames_init();
+
+/**
+ * Sporadic task initialization.
+ */
+ void sp_init();
+
+/// UTILS
+
+/**
+ * Start the application
+ */
+void start();
+
+/**
+ * Gracefull application shutdown
+ */
+void stop();
+
+/**
+ * Check is the sporadic task can be accepted considering
+ * his WCET and his DEADLINE
+ */
+bool sp_task_request();
+
+/**
+ * Immediate program termination
+ */
+void shutdown();
+ 
+ /**
+  * Function for timed debug.
+  */
+void print_current_time( char* string, struct timeval origin );
 
 
 //////////////////
@@ -66,27 +203,33 @@ void shutdown(){
 	exit(1);
 }
 
-bool sp_task_request( int current_frame ){
-	double probability  = rand() % 100 / 100.0;
-	printf("Probability is: %f\n", probability);	
-	if( probability <= SP_REQUEST_PROBABILITY && sp_data.state == IDLE ){
+bool sp_task_request(){
+
+	pthread_mutex_lock(&mutex);
+	if( sp_data.state == IDLE ){
 		sp_data.state = PENDING;
 		printf("** SPORADIC REQUEST\n");		
 	}
+	pthread_mutex_unlock(&mutex);
+
 	if( sp_data.state == PENDING ){ 
 		int frame_number = SP_DLINE / (H_PERIOD / NUM_FRAMES);
 		int available_execution = 0;
 		int count = 0;
 		while( count < frame_number ){
-			available_execution += SLACK[(current_frame + count) % NUM_FRAMES];
+			available_execution += SLACK[(frame_counter + count) % NUM_FRAMES];
 			count++;
 		}
 		if( available_execution >= SP_WCET && sp_data.state == PENDING ){
-			printf("** SPORADIC JOB ACCEPTED!!\n");
+			printf("** SPORADIC JOB ACCEPTED!!\n");			
 			return true;
 		}
 		printf("** SPORADIC JOB REJECTED - SP_WCET = %d, AVAILABLE EXECUTION = %d, on %d FRAMES\n", SP_WCET, available_execution, frame_number);
+
+		pthread_mutex_lock(&mutex);
 		sp_data.state = IDLE;
+		pthread_mutex_unlock(&mutex);
+
 	}
 	return false;
 }
@@ -94,7 +237,7 @@ bool sp_task_request( int current_frame ){
 void print_current_time(char* string, struct timeval origin){
 	struct timeval now;
 	gettimeofday(&now, NULL);
-	printf("** %s - TIMING second: %ld, milliseconds: %ld\n",string, now.tv_sec - origin.tv_sec, (now.tv_usec - origin.tv_usec)/1000);
+	printf("**** %s - TIMING second: %ld, milliseconds: %ld\n",string, now.tv_sec - origin.tv_sec, (now.tv_usec - origin.tv_usec)/1000);
 }
 
 
@@ -162,8 +305,10 @@ void* sp_task_handler(void *param){
 	while( true ){
 		pthread_mutex_lock( &mutex );
 		sp_data.state = IDLE;
-		print_current_time(" >>>>>>>>>> SPORADIC JOB TERMINATED", zero);
-		pthread_cond_wait( &sp->thread_data.queue, &mutex );
+		print_current_time(" -!!!!!!- SPORADIC JOB TERMINATED", zero);
+		while( sp_data.state == IDLE ){
+			pthread_cond_wait( &sp->thread_data.queue, &mutex );
+		}
 		pthread_mutex_unlock( &mutex );	
 		printf("Sporadic job is awake!\n");
 		SP_TASK();
@@ -174,10 +319,13 @@ void* sp_task_handler(void *param){
 void* frame_handler(void *param){
 	frame_data_t *frame_data = (frame_data_t*)param;
 	printf( "Thread %d is sleeping.\n", frame_data->id );
-	
+
+	// Loop infinito per l'esecuzione dei task del frame.	
 	while( true ){
 		pthread_mutex_lock( &mutex );
-		pthread_cond_wait( &frame_data->thread_data.queue, &mutex );
+		while( frame_data->state != PENDING ){
+			pthread_cond_wait( &frame_data->thread_data.queue, &mutex );
+		}
 		pthread_mutex_unlock( &mutex );
 
 		// Thread started ...	
@@ -222,7 +370,7 @@ void* executive(void* param){
 	struct timespec time;
 	struct timespec slack_time;
 
-	int frame_counter = 0;
+	frame_counter = 0;
 
 	// Setting the starting time.	
 	gettimeofday(&zero,NULL);	
@@ -231,11 +379,16 @@ void* executive(void* param){
 	
 	while( true ){
 		// Print info
-		printf("====================\n");
+		printf("===============================(Frame %d started)==============================\n", frame_counter);
 		print_current_time("FRAME_STARTED", zero);
+	
+		// Settiamo il frame corrente allo stato PENDING, in modo che alla fine del frame il deadlinemiss_handler
+		// controlli lo stato del frame. Se il frame viene trovato PENDING vuole dire che non è stato schedulato dal sistema.
+		// Il che rappresenta una condizione ancora più critica rispetto alla "semplice" deadlinemiss, il programma verrà quindi terminato.	
+		frames[frame_counter].state = PENDING;
 		
 		// Sporadic task creation and initialization
-		if( sp_task_request(frame_counter) ){
+		if( sp_data.state == PENDING ){
 			sp_data.state = BUSY;
 			sp_data.deadline_counter = SP_DLINE / (H_PERIOD / NUM_FRAMES);
 			pthread_mutex_lock( &mutex );	
@@ -246,8 +399,7 @@ void* executive(void* param){
 		
 		// Setto il risveglio dell'executive allo scadere dello slack, se il task sporadico è stato ritrovato running.	
 		if( sp_data.state == BUSY ){
-			printf("--------------------\n");
-		
+			printf("------------------------------(Slack time started)----------------------------\n");	
 			if( sp_data.deadline_counter == 0 ){
 				printf("**!!** SPORADIC TASK DEADLINE MISS **!!**\n");
 				shutdown();
@@ -260,6 +412,7 @@ void* executive(void* param){
 			sp_data.thread_data.param.sched_priority = high_priority;	
 			pthread_setschedparam( sp_data.thread_data.thread, SCHED_FIFO, &sp_data.thread_data.param );
 			
+			// Calcolo del tempo relativo alla scadenza dello slack time.
 			slack_wakeup_time = SLACK[frame_counter] * TIME_UNIT_IN_MILLI * MILLI_TO_NANO;		
 			pthread_mutex_lock( &mutex );
 			slack_time.tv_sec =  time.tv_sec + slack_wakeup_time / 1000000000;
@@ -267,9 +420,10 @@ void* executive(void* param){
 			pthread_cond_timedwait( &executive_data.queue, &mutex, &slack_time );
 			pthread_mutex_unlock( &mutex );
 
+			// Un frame è passato.
 			sp_data.deadline_counter -= 1;
 			print_current_time("EXECUTION DURING SLACK TERMINATED", zero);
-			printf("--------------------\n");
+			printf("------------------------------(Slack time ended)------------------------------\n");
 		
 			// Scaduto il tempo in cui il task sporadico può eseguire, ripristino a priorità
 			// superiore i thread dei frame.
@@ -282,16 +436,17 @@ void* executive(void* param){
 			// Se non devo eseguire il task sporadico, semplicemente, segnalo al frame di partire all'inizio.	
 			pthread_cond_signal( &(frames[frame_counter].thread_data.queue) );	
 		}
+		// Calcolo del tempo di risveglio dell'executive dopo la scadenza del frame.
 		pthread_mutex_lock( &mutex );				
 		time.tv_sec += ( time.tv_nsec + wakeup_time ) / 1000000000;
 		time.tv_nsec = ( time.tv_nsec + wakeup_time ) % 1000000000;
 		pthread_cond_timedwait( &executive_data.queue, &mutex, &time );
 		pthread_mutex_unlock( &mutex );
-		
+
+		// --- DOPO IL RISVEGLIO
+	
 		// Check deadline		
 		deadlinemiss_handler(frame_counter);
-		
-		frames[frame_counter].state = PENDING;
 				
 		++frame_counter; 
 		frame_counter = frame_counter % NUM_FRAMES; 
